@@ -5,6 +5,9 @@ import { Layout } from './components/layout/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Kasir from './pages/Kasir';
+import Settings from './pages/Settings';
+import Inventory from './pages/Inventory';
+import Laporan from './pages/Laporan';
 
 function App() {
   const { isAuthenticated } = useAuthStore();
@@ -24,10 +27,10 @@ function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/kasir" element={<Kasir />} />
-          <Route path="/inventori" element={<div className="p-6">Inventori - Coming Soon</div>} />
+          <Route path="/inventori" element={<Inventory />} />
           <Route path="/pemesanan" element={<div className="p-6">Pemesanan - Coming Soon</div>} />
-          <Route path="/laporan" element={<div className="p-6">Laporan - Coming Soon</div>} />
-          <Route path="/pengaturan" element={<div className="p-6">Pengaturan - Coming Soon</div>} />
+          <Route path="/laporan" element={<Laporan />} />
+          <Route path="/pengaturan" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>

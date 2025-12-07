@@ -112,12 +112,12 @@ const Kasir: React.FC = () => {
   };
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      <div className="mb-6">
-        <h1 className="text-3xl font-display font-bold text-gray-900 mb-2">
+    <div className="p-4 md:p-6 bg-gray-50 min-h-screen">
+      <div className="mb-6 mt-12 md:mt-0">
+        <h1 className="text-2xl md:text-3xl font-display font-bold text-gray-900 mb-2">
           Kasir
         </h1>
-        <p className="text-gray-600">
+        <p className="text-sm md:text-base text-gray-600">
           Proses transaksi penjualan dengan cepat dan akurat.
         </p>
       </div>

@@ -63,12 +63,12 @@ const Dashboard: React.FC = () => {
   ];
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      <div className="mb-8">
-        <h1 className="text-3xl font-display font-bold text-gray-900 mb-2">
+    <div className="p-4 md:p-6 bg-gray-50 min-h-screen">
+      <div className="mb-8 mt-12 md:mt-0">
+        <h1 className="text-2xl md:text-3xl font-display font-bold text-gray-900 mb-2">
           Dashboard
         </h1>
-        <p className="text-gray-600">
+        <p className="text-sm md:text-base text-gray-600">
           Selamat datang kembali! Berikut ringkasan performa bisnis Anda hari ini.
         </p>
       </div>

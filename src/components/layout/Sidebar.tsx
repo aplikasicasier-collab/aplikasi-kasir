@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../stores/authStore';
+import { AppLogo } from '../ui/AppLogo';
+
 import { supabase } from '../../lib/supabaseClient';
 
 interface SidebarProps {
@@ -37,18 +39,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeRoute, onNavigate }) => 
     <motion.div
       initial={{ x: -300 }}
       animate={{ x: 0 }}
-      className="w-64 bg-gradient-dark shadow-2xl h-screen fixed left-0 top-0 z-50"
+      className="w-64 bg-gradient-dark shadow-2xl h-screen flex flex-col"
     >
-      <div className="p-6 border-b border-white/10">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-gradient-purple rounded-lg flex items-center justify-center">
-            <Store className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-white font-display font-bold text-lg">POS Premium</h1>
-            <p className="text-gray-300 text-sm">Sistem Kasir Modern</p>
-          </div>
-        </div>
+      <div className="p-6 border-b border-white/10 flex flex-col items-center text-center">
+        <AppLogo size="md" className="mb-2" />
+        <p className="text-gray-300 text-sm mt-1">Sistem Kasir Modern</p>
       </div>
 
       <nav className="p-4 flex-1">
