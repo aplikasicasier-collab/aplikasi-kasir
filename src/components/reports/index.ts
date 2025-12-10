@@ -4,3 +4,5 @@ export { TopProductsChart } from './TopProductsChart';
 export { SalesReport } from './SalesReport';
 export { StockReport } from './StockReport';
 export { StockMovementReport } from './StockMovementReport';
+export { DiscountReport } from './DiscountReport';
+export { ReturnReport } from './ReturnReport';

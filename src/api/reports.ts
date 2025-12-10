@@ -9,6 +9,11 @@ export interface DateRange {
   endDate: string;
 }
 
+// Outlet filter for multi-outlet support
+export interface OutletFilter {
+  outletId?: string; // Specific outlet ID, or undefined for all outlets
+}
+
 // Stock Report Types
 export type StockStatus = 'low' | 'normal' | 'overstocked';
 
@@ -94,22 +99,32 @@ export interface DashboardData {
 
 /**
  * Get sales report for a date range with grouping by hour (daily) or day (monthly)
+ * Supports outlet filtering for multi-outlet reports
  * **Feature: laporan, Property 1: Sales Aggregation Accuracy**
- * **Validates: Requirements 1.1, 1.3, 1.4**
+ * **Feature: multi-outlet, Property 12: Report Outlet Filtering**
+ * **Validates: Requirements 1.1, 1.3, 1.4, 6.1, 6.2, 6.3**
  */
 export async function getSalesReport(
   dateRange: DateRange,
-  groupBy: 'hour' | 'day'
+  groupBy: 'hour' | 'day',
+  outletFilter?: OutletFilter
 ): Promise<SalesReportData> {
   const { startDate, endDate } = dateRange;
 
-  // Get all completed transactions in date range
-  const { data: transactions, error: txError } = await supabase
+  // Build query with optional outlet filter
+  let query = supabase
     .from('transactions')
     .select('id, total_amount, transaction_date')
     .eq('status', 'completed')
     .gte('transaction_date', startDate)
     .lte('transaction_date', endDate);
+
+  // Apply outlet filter if specified
+  if (outletFilter?.outletId) {
+    query = query.eq('outlet_id', outletFilter.outletId);
+  }
+
+  const { data: transactions, error: txError } = await query;
 
   if (txError) throw txError;
 
@@ -123,9 +138,9 @@ export async function getSalesReport(
   // Group by period
   const salesByPeriod = groupSalesByPeriod(txList, groupBy);
 
-  // Get top products
-  const topProductsByQuantity = await getTopProductsByQuantity(startDate, endDate);
-  const topProductsByRevenue = await getTopProductsByRevenue(startDate, endDate);
+  // Get top products with outlet filter
+  const topProductsByQuantity = await getTopProductsByQuantity(startDate, endDate, outletFilter);
+  const topProductsByRevenue = await getTopProductsByRevenue(startDate, endDate, outletFilter);
 
   return {
     totalSales,
@@ -178,26 +193,36 @@ function groupSalesByPeriod(
 
 /**
  * Get top 10 products by quantity sold
+ * Supports outlet filtering for multi-outlet reports
  * **Feature: laporan, Property 2: Top Products Ranking**
- * **Validates: Requirements 2.1, 2.2, 2.3**
+ * **Feature: multi-outlet, Property 12: Report Outlet Filtering**
+ * **Validates: Requirements 2.1, 2.2, 2.3, 6.2, 6.3**
  */
 async function getTopProductsByQuantity(
   startDate: string,
-  endDate: string
+  endDate: string,
+  outletFilter?: OutletFilter
 ): Promise<TopProduct[]> {
-  // Get transaction items with product info for completed transactions
-  const { data, error } = await supabase
+  // Build query with optional outlet filter
+  let query = supabase
     .from('transaction_items')
     .select(`
       quantity,
       total_price,
       product_id,
       products!inner(name),
-      transactions!inner(status, transaction_date)
+      transactions!inner(status, transaction_date, outlet_id)
     `)
     .eq('transactions.status', 'completed')
     .gte('transactions.transaction_date', startDate)
     .lte('transactions.transaction_date', endDate);
+
+  // Apply outlet filter if specified
+  if (outletFilter?.outletId) {
+    query = query.eq('transactions.outlet_id', outletFilter.outletId);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
 
@@ -232,26 +257,36 @@ async function getTopProductsByQuantity(
 
 /**
  * Get top 10 products by revenue
+ * Supports outlet filtering for multi-outlet reports
  * **Feature: laporan, Property 2: Top Products Ranking**
- * **Validates: Requirements 2.1, 2.2, 2.3**
+ * **Feature: multi-outlet, Property 12: Report Outlet Filtering**
+ * **Validates: Requirements 2.1, 2.2, 2.3, 6.2, 6.3**
  */
 async function getTopProductsByRevenue(
   startDate: string,
-  endDate: string
+  endDate: string,
+  outletFilter?: OutletFilter
 ): Promise<TopProduct[]> {
-  // Get transaction items with product info for completed transactions
-  const { data, error } = await supabase
+  // Build query with optional outlet filter
+  let query = supabase
     .from('transaction_items')
     .select(`
       quantity,
       total_price,
       product_id,
       products!inner(name),
-      transactions!inner(status, transaction_date)
+      transactions!inner(status, transaction_date, outlet_id)
     `)
     .eq('transactions.status', 'completed')
     .gte('transactions.transaction_date', startDate)
     .lte('transactions.transaction_date', endDate);
+
+  // Apply outlet filter if specified
+  if (outletFilter?.outletId) {
+    query = query.eq('transactions.outlet_id', outletFilter.outletId);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
 
@@ -522,28 +557,73 @@ export function filterStockReportData(
 
 /**
  * Get stock report for all active products with optional filtering
+ * Supports outlet filtering for multi-outlet stock reports
  * **Feature: laporan, Property 3: Stock Report Data Integrity**
- * **Validates: Requirements 3.1, 3.2, 3.3, 3.4**
+ * **Feature: multi-outlet, Property 12: Report Outlet Filtering**
+ * **Validates: Requirements 3.1, 3.2, 3.3, 3.4, 6.2, 6.3**
  */
-export async function getStockReport(filters?: StockFilters): Promise<StockReportData> {
-  // Get all active products
-  const { data: products, error } = await supabase
-    .from('products')
-    .select('id, name, stock_quantity, min_stock, price, category_id')
-    .eq('is_active', true)
-    .order('name');
+export async function getStockReport(
+  filters?: StockFilters,
+  outletFilter?: OutletFilter
+): Promise<StockReportData> {
+  if (outletFilter?.outletId) {
+    // Get outlet-specific stock
+    const { data: outletStock, error } = await supabase
+      .from('outlet_stock')
+      .select(`
+        quantity,
+        product_id,
+        products!inner(id, name, min_stock, price, category_id, is_active)
+      `)
+      .eq('outlet_id', outletFilter.outletId)
+      .eq('products.is_active', true);
 
-  if (error) throw error;
+    if (error) throw error;
 
-  // Process raw data into stock report format
-  const reportData = processStockReportData(products || []);
+    // Transform outlet stock to product format
+    const products = (outletStock || []).map(os => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      id: (os.products as any).id,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      name: (os.products as any).name,
+      stock_quantity: os.quantity,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      min_stock: (os.products as any).min_stock,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      price: (os.products as any).price,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      category_id: (os.products as any).category_id,
+    }));
 
-  // Apply filters if provided
-  if (filters && (filters.category || filters.stockStatus)) {
-    return filterStockReportData(reportData, filters);
+    // Process raw data into stock report format
+    const reportData = processStockReportData(products);
+
+    // Apply filters if provided
+    if (filters && (filters.category || filters.stockStatus)) {
+      return filterStockReportData(reportData, filters);
+    }
+
+    return reportData;
+  } else {
+    // Get global stock (all outlets combined or legacy behavior)
+    const { data: products, error } = await supabase
+      .from('products')
+      .select('id, name, stock_quantity, min_stock, price, category_id')
+      .eq('is_active', true)
+      .order('name');
+
+    if (error) throw error;
+
+    // Process raw data into stock report format
+    const reportData = processStockReportData(products || []);
+
+    // Apply filters if provided
+    if (filters && (filters.category || filters.stockStatus)) {
+      return filterStockReportData(reportData, filters);
+    }
+
+    return reportData;
   }
-
-  return reportData;
 }
 
 // ============================================
@@ -573,6 +653,7 @@ export interface MovementFilters {
   endDate?: string;
   productId?: string;
   movementType?: MovementType;
+  outletId?: string; // Optional outlet filter for multi-outlet support
 }
 
 /**
@@ -692,8 +773,10 @@ export function processStockMovements(
 
 /**
  * Get stock movements with optional filtering
+ * Supports outlet filtering for multi-outlet reports
  * **Feature: laporan, Property 5: Stock Movements with Running Balance**
- * **Validates: Requirements 4.1, 4.2, 4.3**
+ * **Feature: multi-outlet, Property 12: Report Outlet Filtering**
+ * **Validates: Requirements 4.1, 4.2, 4.3, 6.2, 6.3**
  */
 export async function getStockMovements(filters?: MovementFilters): Promise<StockMovementData> {
   // Build query
@@ -707,6 +790,7 @@ export async function getStockMovements(filters?: MovementFilters): Promise<Stoc
       quantity,
       reference_type,
       reference_id,
+      outlet_id,
       products!inner(name)
     `)
     .order('created_at', { ascending: false });
@@ -723,6 +807,10 @@ export async function getStockMovements(filters?: MovementFilters): Promise<Stoc
   }
   if (filters?.movementType) {
     query = query.eq('movement_type', filters.movementType);
+  }
+  // Apply outlet filter if specified
+  if (filters?.outletId) {
+    query = query.eq('outlet_id', filters.outletId);
   }
 
   const { data, error } = await query;
@@ -944,32 +1032,66 @@ export function processDashboardData(
 
 /**
  * Get dashboard summary with all metrics
+ * Supports outlet filtering for multi-outlet dashboards
  * **Feature: laporan, Property 7: Dashboard Summary Accuracy**
+ * **Feature: multi-outlet, Property 12: Report Outlet Filtering**
  * **Validates: Requirements 6.1, 6.2, 6.3, 6.4**
  */
-export async function getDashboardSummary(): Promise<DashboardData> {
+export async function getDashboardSummary(outletFilter?: OutletFilter): Promise<DashboardData> {
   const dateRanges = getDashboardDateRanges();
   
-  // Fetch all transactions from the earliest date we need (last week start)
-  const { data: transactions, error: txError } = await supabase
+  // Build transaction query with optional outlet filter
+  let txQuery = supabase
     .from('transactions')
     .select('id, transaction_number, total_amount, transaction_date, status')
     .gte('transaction_date', dateRanges.lastWeekStart)
     .order('transaction_date', { ascending: false });
   
+  if (outletFilter?.outletId) {
+    txQuery = txQuery.eq('outlet_id', outletFilter.outletId);
+  }
+  
+  const { data: transactions, error: txError } = await txQuery;
+  
   if (txError) throw txError;
   
-  // Fetch all active products for low stock count
-  const { data: products, error: productError } = await supabase
-    .from('products')
-    .select('stock_quantity, min_stock, is_active')
-    .eq('is_active', true);
+  // Fetch stock data - either outlet-specific or global
+  let products: Array<{ stock_quantity: number; min_stock: number; is_active?: boolean }> = [];
   
-  if (productError) throw productError;
+  if (outletFilter?.outletId) {
+    // Get outlet-specific stock
+    const { data: outletStock, error: stockError } = await supabase
+      .from('outlet_stock')
+      .select(`
+        quantity,
+        products!inner(min_stock, is_active)
+      `)
+      .eq('outlet_id', outletFilter.outletId)
+      .eq('products.is_active', true);
+    
+    if (stockError) throw stockError;
+    
+    products = (outletStock || []).map(os => ({
+      stock_quantity: os.quantity,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      min_stock: (os.products as any).min_stock,
+      is_active: true,
+    }));
+  } else {
+    // Get global stock
+    const { data: productData, error: productError } = await supabase
+      .from('products')
+      .select('stock_quantity, min_stock, is_active')
+      .eq('is_active', true);
+    
+    if (productError) throw productError;
+    
+    products = productData || [];
+  }
   
   return processDashboardData(
     transactions || [],
-    products || [],
+    products,
     dateRanges
   );
 }
@@ -977,3 +1099,40 @@ export async function getDashboardSummary(): Promise<DashboardData> {
 // Export helper functions for testing
 export { groupSalesByPeriod };
 export { getTopProductsByQuantity, getTopProductsByRevenue };
+
+// ============================================
+// Pure functions for outlet filtering (testing)
+// ============================================
+
+/**
+ * Filter transactions by outlet (pure function for testing)
+ * **Feature: multi-outlet, Property 12: Report Outlet Filtering**
+ * **Validates: Requirements 6.2, 6.3**
+ */
+export function filterTransactionsByOutletForReport(
+  transactions: Array<{ id: string; total_amount: number; transaction_date: string; outlet_id?: string }>,
+  outletId?: string
+): Array<{ id: string; total_amount: number; transaction_date: string; outlet_id?: string }> {
+  if (!outletId) {
+    // Return all transactions when no outlet filter
+    return transactions;
+  }
+  return transactions.filter(tx => tx.outlet_id === outletId);
+}
+
+/**
+ * Aggregate sales data with outlet filtering (pure function for testing)
+ * **Feature: multi-outlet, Property 12: Report Outlet Filtering**
+ * **Validates: Requirements 6.2, 6.3**
+ */
+export function aggregateSalesWithOutletFilter(
+  transactions: Array<{ id: string; total_amount: number; transaction_date: string; outlet_id?: string }>,
+  outletId?: string
+): { totalSales: number; transactionCount: number } {
+  const filtered = filterTransactionsByOutletForReport(transactions, outletId);
+  
+  const totalSales = filtered.reduce((sum, tx) => sum + Number(tx.total_amount), 0);
+  const transactionCount = filtered.length;
+  
+  return { totalSales, transactionCount };
+}

@@ -18,8 +18,11 @@ import {
 } from '../../api/reports';
 import { exportReport } from '../../api/export';
 
+import { OutletFilter } from '../../api/reports';
+
 interface SalesReportProps {
   onProductClick?: (productId: string) => void;
+  outletFilter?: OutletFilter;
 }
 
 /**
@@ -48,7 +51,7 @@ function getDefaultDateRange(): DateRange {
   };
 }
 
-export const SalesReport: React.FC<SalesReportProps> = ({ onProductClick }) => {
+export const SalesReport: React.FC<SalesReportProps> = ({ onProductClick, outletFilter }) => {
   const [dateRange, setDateRange] = useState<DateRange>(getDefaultDateRange());
   const [reportData, setReportData] = useState<SalesReportData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -57,14 +60,15 @@ export const SalesReport: React.FC<SalesReportProps> = ({ onProductClick }) => {
 
   useEffect(() => {
     loadReport();
-  }, [dateRange, viewMode]);
+  }, [dateRange, viewMode, outletFilter]);
 
   const loadReport = async () => {
     setIsLoading(true);
     setError(null);
     try {
       const groupBy = viewMode === 'daily' ? 'hour' : 'day';
-      const data = await getSalesReport(dateRange, groupBy);
+      // Apply outlet filter for multi-outlet support (Requirements: 6.2, 6.3)
+      const data = await getSalesReport(dateRange, groupBy, outletFilter);
       setReportData(data);
     } catch (err) {
       setError('Gagal memuat laporan penjualan');

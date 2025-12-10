@@ -1,50 +1,58 @@
 import React, { useState } from 'react';
-import { Store, User, Lock, Eye, EyeOff } from 'lucide-react';
+import { User, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { Button } from '../components/ui/Button';
-import { supabase } from '../lib/supabaseClient';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { useAuthStore } from '../stores/authStore';
 import { BackgroundAnimation } from '../components/ui/BackgroundAnimation';
-
 import { AppLogo } from '../components/ui/AppLogo';
-
-import Register from './Register';
+import { login as authLogin } from '../api/auth';
+import { ChangePasswordModal } from '../components/users/ChangePasswordModal';
 
 const Login: React.FC = () => {
-  const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const login = useAuthStore((state) => state.login);
-
-  if (isRegistering) {
-    return <Register onSwitchToLogin={() => setIsRegistering(false)} />;
-  }
+  const [error, setError] = useState<string | null>(null);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  
+  const storeLogin = useAuthStore((state) => state.login);
+  const setMustChangePassword = useAuthStore((state) => state.setMustChangePassword);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null);
+    
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-
-      const sUser = data.user!;
-      login({
-        id: sUser.id,
-        email: sUser.email || email,
-        full_name: 'Admin User',
-        role: 'admin',
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
+      // Use login function from auth API with activity logging (Requirement 7.3)
+      const result = await authLogin({ email, password });
+      
+      // Store user in auth store
+      storeLogin(result.user);
+      
+      // Handle must_change_password redirect (Requirement 3.2)
+      if (result.mustChangePassword) {
+        setShowChangePasswordModal(true);
+      }
     } catch (err: any) {
       console.error(err);
-      alert('Login gagal. Periksa email dan password Anda.');
+      // Handle inactive user error (Requirement 2.3)
+      // The auth API returns specific error messages for different scenarios
+      setError(err.message || 'Login gagal. Periksa email dan password Anda.');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handlePasswordChangeSuccess = () => {
+    setShowChangePasswordModal(false);
+    setMustChangePassword(false);
+  };
+
+  const handlePasswordChangeClose = () => {
+    // User must change password, cannot close modal without changing
+    // Keep modal open - they need to change password to continue
   };
 
   return (
@@ -67,6 +75,14 @@ const Login: React.FC = () => {
               <CardTitle className="text-white">Masuk ke Aplikasi</CardTitle>
             </CardHeader>
             <CardContent>
+              {/* Error message display (Requirements 2.3, 7.3) */}
+              {error && (
+                <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                  <span className="text-sm text-red-300">{error}</span>
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-300">
@@ -130,19 +146,20 @@ const Login: React.FC = () => {
 
               <div className="mt-6 text-center">
                 <p className="text-sm text-gray-400">
-                  Belum punya akun?{' '}
-                  <button 
-                    onClick={() => setIsRegistering(true)}
-                    className="text-gold-400 hover:text-gold-300 font-medium focus:outline-none"
-                  >
-                    Daftar di sini
-                  </button>
+                  Hubungi administrator untuk mendapatkan akun.
                 </p>
               </div>
             </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* Change Password Modal for must_change_password redirect (Requirement 3.2) */}
+      <ChangePasswordModal
+        isOpen={showChangePasswordModal}
+        onClose={handlePasswordChangeClose}
+        onSuccess={handlePasswordChangeSuccess}
+      />
     </div>
   );
 };

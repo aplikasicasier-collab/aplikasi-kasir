@@ -18,8 +18,11 @@ import {
 } from '../../api/reports';
 import { exportReport } from '../../api/export';
 
+import { OutletFilter } from '../../api/reports';
+
 interface StockReportProps {
   onProductClick?: (productId: string) => void;
+  outletFilter?: OutletFilter;
 }
 
 /**
@@ -48,7 +51,7 @@ function getStatusBadge(status: StockStatus): { bg: string; text: string; label:
   }
 }
 
-export const StockReport: React.FC<StockReportProps> = ({ onProductClick }) => {
+export const StockReport: React.FC<StockReportProps> = ({ onProductClick, outletFilter }) => {
   const [reportData, setReportData] = useState<StockReportData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,13 +60,14 @@ export const StockReport: React.FC<StockReportProps> = ({ onProductClick }) => {
 
   useEffect(() => {
     loadReport();
-  }, [filters]);
+  }, [filters, outletFilter]);
 
   const loadReport = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await getStockReport(filters);
+      // Apply outlet filter for multi-outlet support (Requirements: 6.2, 6.3)
+      const data = await getStockReport(filters, outletFilter);
       setReportData(data);
     } catch (err) {
       setError('Gagal memuat laporan stok');

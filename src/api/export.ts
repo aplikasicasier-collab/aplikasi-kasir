@@ -4,7 +4,7 @@
  * **Validates: Requirements 5.1, 5.2, 5.3, 5.4**
  */
 
-export type ReportType = 'sales' | 'stock' | 'movements' | 'dashboard';
+export type ReportType = 'sales' | 'stock' | 'movements' | 'dashboard' | 'discount' | 'return';
 
 export interface ExportOptions {
   reportType: ReportType;
@@ -127,6 +127,8 @@ export function generateFilename(
     stock: 'laporan-stok',
     movements: 'laporan-pergerakan-stok',
     dashboard: 'laporan-dashboard',
+    discount: 'laporan-diskon',
+    return: 'laporan-retur',
   };
   
   const baseName = reportTypeNames[reportType];

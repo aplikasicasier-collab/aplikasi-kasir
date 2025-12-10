@@ -241,7 +241,7 @@ describe('CSV Export Completeness', () => {
  * **Validates: Requirements 5.4**
  */
 describe('Filename Generation', () => {
-  const reportTypeArb = fc.constantFrom<ReportType>('sales', 'stock', 'movements', 'dashboard');
+  const reportTypeArb = fc.constantFrom<ReportType>('sales', 'stock', 'movements', 'dashboard', 'discount');
 
   // Arbitrary for valid ISO date strings
   const dateArb = fc.integer({ min: 1704067200000, max: 1735689600000 })
@@ -259,6 +259,7 @@ describe('Filename Generation', () => {
             stock: 'laporan-stok',
             movements: 'laporan-pergerakan-stok',
             dashboard: 'laporan-dashboard',
+            discount: 'laporan-diskon',
           };
           
           return filename.includes(expectedTypeNames[reportType]);

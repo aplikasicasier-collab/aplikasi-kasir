@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { ReturnPolicyForm } from '../components/retur';
+import { RetentionSettings } from '../components/audit';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useAuthStore } from '../stores/authStore';
 import { supabase } from '../lib/supabaseClient';
@@ -256,6 +258,26 @@ const Settings: React.FC = () => {
               </CardContent>
             </Card>
           </motion.div>
+
+          {/* Return Policy Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <ReturnPolicyForm />
+          </motion.div>
+
+          {/* Audit Log Retention Settings - Admin Only */}
+          {user?.role === 'admin' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <RetentionSettings />
+            </motion.div>
+          )}
         </div>
 
         {/* Info Panel */}

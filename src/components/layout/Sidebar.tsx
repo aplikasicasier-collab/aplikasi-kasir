@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -9,7 +9,16 @@ import {
   Settings,
   Users,
   LogOut,
-  Store
+  Store,
+  Tag,
+  Truck,
+  Shield,
+  User,
+  ArrowRightLeft,
+  Percent,
+  ClipboardList,
+  RotateCcw,
+  ScrollText
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../stores/authStore';
@@ -22,18 +31,40 @@ interface SidebarProps {
   onNavigate: (route: string) => void;
 }
 
-const menuItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', route: '/' },
-  { icon: ShoppingCart, label: 'Kasir', route: '/kasir' },
-  { icon: Package, label: 'Inventori', route: '/inventori' },
-  { icon: FileText, label: 'Pemesanan', route: '/pemesanan' },
-  { icon: FileText, label: 'Laporan', route: '/laporan' },
-  { icon: Users, label: 'Pengaturan', route: '/pengaturan' },
+interface MenuItem {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  route: string;
+  permissionRoute: string; // Route used for permission checking
+}
+
+// All menu items with their permission routes
+const allMenuItems: MenuItem[] = [
+  { icon: LayoutDashboard, label: 'Dashboard', route: '/', permissionRoute: '/' },
+  { icon: ShoppingCart, label: 'Kasir', route: '/kasir', permissionRoute: '/kasir' },
+  { icon: Package, label: 'Inventori', route: '/inventori', permissionRoute: '/inventory' },
+  { icon: Tag, label: 'Kategori', route: '/kategori', permissionRoute: '/kategori' },
+  { icon: Truck, label: 'Supplier', route: '/supplier', permissionRoute: '/supplier' },
+  { icon: Percent, label: 'Diskon & Promo', route: '/diskon', permissionRoute: '/diskon' },
+  { icon: RotateCcw, label: 'Retur & Refund', route: '/retur', permissionRoute: '/retur' },
+  { icon: FileText, label: 'Pemesanan', route: '/pemesanan', permissionRoute: '/pemesanan' },
+  { icon: FileText, label: 'Laporan', route: '/laporan', permissionRoute: '/laporan' },
+  { icon: Store, label: 'Outlet', route: '/outlet', permissionRoute: '/outlet' },
+  { icon: ArrowRightLeft, label: 'Transfer Stok', route: '/stock-transfer', permissionRoute: '/stock-transfer' },
+  { icon: ClipboardList, label: 'Stock Opname', route: '/stock-opname', permissionRoute: '/stock-opname' },
+  { icon: Shield, label: 'User Management', route: '/user-management', permissionRoute: '/users' },
+  { icon: ScrollText, label: 'Audit Log', route: '/audit-log', permissionRoute: '/audit-log' },
+  { icon: Settings, label: 'Pengaturan', route: '/pengaturan', permissionRoute: '/settings' },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeRoute, onNavigate }) => {
-  const { user, logout } = useAuthStore();
+  const { user, logout, canAccessRoute } = useAuthStore();
   const navigate = useNavigate();
+
+  // Filter menu items based on user's role permissions (Requirement 5.5)
+  const accessibleMenuItems = useMemo(() => {
+    return allMenuItems.filter(item => canAccessRoute(item.permissionRoute));
+  }, [canAccessRoute]);
 
   return (
     <motion.div
@@ -46,9 +77,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeRoute, onNavigate }) => 
         <p className="text-gray-300 text-sm mt-1">Sistem Kasir Modern</p>
       </div>
 
-      <nav className="p-4 flex-1">
+      <nav className="p-4 flex-1 overflow-y-auto">
         <ul className="space-y-2">
-          {menuItems.map((item, index) => {
+          {accessibleMenuItems.map((item, index) => {
             const Icon = item.icon;
             const isActive = activeRoute === item.route;
             
@@ -82,15 +113,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeRoute, onNavigate }) => 
       </nav>
 
       <div className="p-4 border-t border-white/10">
-        <div className="flex items-center space-x-3 mb-4">
+        {/* User Profile Section */}
+        <button
+          onClick={() => {
+            onNavigate('/profile');
+            navigate('/profile');
+          }}
+          className="w-full flex items-center space-x-3 mb-4 p-2 rounded-lg hover:bg-white/10 transition-all duration-200"
+        >
           <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center">
-            <Users className="w-4 h-4 text-white" />
+            <User className="w-4 h-4 text-white" />
           </div>
-          <div>
+          <div className="text-left">
             <p className="text-white text-sm font-medium">{user?.full_name}</p>
             <p className="text-gray-400 text-xs capitalize">{user?.role}</p>
           </div>
-        </div>
+        </button>
         
         <button
           onClick={async () => {

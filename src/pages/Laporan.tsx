@@ -4,17 +4,24 @@ import {
   LayoutDashboard, 
   TrendingUp, 
   Package, 
-  ArrowLeftRight 
+  ArrowLeftRight,
+  Store,
+  Percent,
+  RotateCcw
 } from 'lucide-react';
 import { 
   DashboardSummary, 
   SalesReport, 
   StockReport, 
-  StockMovementReport 
+  StockMovementReport,
+  DiscountReport,
+  ReturnReport
 } from '../components/reports';
-import { getDashboardSummary, DashboardData } from '../api/reports';
+import { getDashboardSummary, DashboardData, OutletFilter } from '../api/reports';
+import { useOutlet } from '../contexts/OutletContext';
+import { Outlet } from '../types';
 
-type TabType = 'dashboard' | 'sales' | 'stock' | 'movements';
+type TabType = 'dashboard' | 'sales' | 'stock' | 'movements' | 'discount' | 'return';
 
 interface TabConfig {
   id: TabType;
@@ -27,29 +34,58 @@ const tabs: TabConfig[] = [
   { id: 'sales', label: 'Penjualan', icon: TrendingUp },
   { id: 'stock', label: 'Stok', icon: Package },
   { id: 'movements', label: 'Pergerakan', icon: ArrowLeftRight },
+  { id: 'discount', label: 'Diskon', icon: Percent },
+  { id: 'return', label: 'Retur', icon: RotateCcw },
 ];
 
 export const Laporan: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
+  
+  // Outlet context for multi-outlet support (Requirements: 6.1, 6.2, 6.3, 6.4)
+  const { currentOutlet, availableOutlets } = useOutlet();
+  
+  // Outlet filter state - defaults to current outlet
+  const [selectedOutletId, setSelectedOutletId] = useState<string | undefined>(undefined);
+  
+  // Initialize selected outlet when current outlet changes
+  useEffect(() => {
+    if (currentOutlet && !selectedOutletId) {
+      setSelectedOutletId(currentOutlet.id);
+    }
+  }, [currentOutlet]);
 
   useEffect(() => {
     if (activeTab === 'dashboard') {
       loadDashboardData();
     }
-  }, [activeTab]);
+  }, [activeTab, selectedOutletId]);
 
   const loadDashboardData = async () => {
     setIsDashboardLoading(true);
     try {
-      const data = await getDashboardSummary();
+      // Apply outlet filter (Requirements: 6.4)
+      const outletFilter: OutletFilter | undefined = selectedOutletId 
+        ? { outletId: selectedOutletId } 
+        : undefined;
+      const data = await getDashboardSummary(outletFilter);
       setDashboardData(data);
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
     } finally {
       setIsDashboardLoading(false);
     }
+  };
+  
+  // Get outlet filter for child components
+  const getOutletFilter = (): OutletFilter | undefined => {
+    return selectedOutletId ? { outletId: selectedOutletId } : undefined;
+  };
+  
+  // Handle outlet filter change
+  const handleOutletChange = (outletId: string) => {
+    setSelectedOutletId(outletId === 'all' ? undefined : outletId);
   };
 
   const handleViewDetails = (section: string) => {
@@ -71,6 +107,8 @@ export const Laporan: React.FC = () => {
   };
 
   const renderTabContent = () => {
+    const outletFilter = getOutletFilter();
+    
     switch (activeTab) {
       case 'dashboard':
         return (
@@ -81,11 +119,15 @@ export const Laporan: React.FC = () => {
           />
         );
       case 'sales':
-        return <SalesReport onProductClick={handleProductClick} />;
+        return <SalesReport onProductClick={handleProductClick} outletFilter={outletFilter} />;
       case 'stock':
-        return <StockReport onProductClick={handleProductClick} />;
+        return <StockReport onProductClick={handleProductClick} outletFilter={outletFilter} />;
       case 'movements':
-        return <StockMovementReport onReferenceClick={handleReferenceClick} />;
+        return <StockMovementReport onReferenceClick={handleReferenceClick} outletFilter={outletFilter} />;
+      case 'discount':
+        return <DiscountReport outletFilter={outletFilter} />;
+      case 'return':
+        return <ReturnReport outletFilter={outletFilter} />;
       default:
         return null;
     }
@@ -93,12 +135,33 @@ export const Laporan: React.FC = () => {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Page Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Laporan</h1>
-        <p className="text-gray-600 mt-1">
-          Analisis penjualan dan stok untuk insight bisnis
-        </p>
+      {/* Page Header with Outlet Filter - Requirements: 6.1, 6.2, 6.3, 6.4 */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Laporan</h1>
+          <p className="text-gray-600 mt-1">
+            Analisis penjualan dan stok untuk insight bisnis
+          </p>
+        </div>
+        
+        {/* Outlet Filter */}
+        {availableOutlets.length > 0 && (
+          <div className="flex items-center gap-2">
+            <Store className="w-4 h-4 text-gray-500" />
+            <select
+              value={selectedOutletId || 'all'}
+              onChange={(e) => handleOutletChange(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white text-sm"
+            >
+              <option value="all">Semua Outlet</option>
+              {availableOutlets.map((outlet) => (
+                <option key={outlet.id} value={outlet.id}>
+                  {outlet.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Tab Navigation */}

@@ -1,9 +1,18 @@
 import { create } from 'zustand';
 import { CartItem, Product } from '../types';
+import { lookupProductByBarcode } from '../api/barcodes';
+
+export interface AddToCartByBarcodeResult {
+  success: boolean;
+  product?: Product;
+  error?: string;
+  isOutOfStock?: boolean;
+}
 
 interface CartState {
   items: CartItem[];
   addItem: (product: Product, quantity?: number, discount?: number) => void;
+  addToCartByBarcode: (barcode: string) => Promise<AddToCartByBarcodeResult>;
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   updateDiscount: (productId: string, discount: number) => void;
@@ -33,6 +42,61 @@ export const useCartStore = create<CartState>((set, get) => ({
         items: [...items, { product, quantity, discount }]
       });
     }
+  },
+
+  /**
+   * Add product to cart by barcode scan
+   * - Looks up product by barcode
+   * - Checks stock availability
+   * - Adds with quantity 1 or increments existing item
+   * Requirements: 1.3, 1.4, 4.3
+   */
+  addToCartByBarcode: async (barcode: string): Promise<AddToCartByBarcodeResult> => {
+    // Look up product by barcode
+    const lookupResult = await lookupProductByBarcode(barcode);
+    
+    if (!lookupResult.found || !lookupResult.product) {
+      return {
+        success: false,
+        error: lookupResult.error || 'Produk tidak ditemukan'
+      };
+    }
+
+    const product = lookupResult.product;
+    const { items, addItem } = get();
+    
+    // Check current quantity in cart
+    const existingItem = items.find(item => item.product.id === product.id);
+    const currentCartQuantity = existingItem ? existingItem.quantity : 0;
+    const requestedQuantity = currentCartQuantity + 1;
+
+    // Check stock availability (Requirement 4.3)
+    if (product.stock_quantity <= 0) {
+      return {
+        success: false,
+        product,
+        error: 'Stok habis',
+        isOutOfStock: true
+      };
+    }
+
+    // Check if adding one more would exceed stock
+    if (requestedQuantity > product.stock_quantity) {
+      return {
+        success: false,
+        product,
+        error: `Stok tidak mencukupi. Tersedia: ${product.stock_quantity}`,
+        isOutOfStock: true
+      };
+    }
+
+    // Add to cart (will increment if exists, or add new with quantity 1)
+    addItem(product, 1, existingItem?.discount || 0);
+
+    return {
+      success: true,
+      product
+    };
   },
   
   removeItem: (productId) => {

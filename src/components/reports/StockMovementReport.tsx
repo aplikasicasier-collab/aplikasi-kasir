@@ -21,8 +21,11 @@ import {
 } from '../../api/reports';
 import { exportReport } from '../../api/export';
 
+import { OutletFilter } from '../../api/reports';
+
 interface StockMovementReportProps {
   onReferenceClick?: (type: string, id: string) => void;
+  outletFilter?: OutletFilter;
 }
 
 /**
@@ -98,7 +101,8 @@ function getReferenceLabel(type?: string): string {
 }
 
 export const StockMovementReport: React.FC<StockMovementReportProps> = ({ 
-  onReferenceClick 
+  onReferenceClick,
+  outletFilter
 }) => {
   const [reportData, setReportData] = useState<StockMovementData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -107,13 +111,18 @@ export const StockMovementReport: React.FC<StockMovementReportProps> = ({
 
   useEffect(() => {
     loadReport();
-  }, [filters]);
+  }, [filters, outletFilter]);
 
   const loadReport = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await getStockMovements(filters);
+      // Apply outlet filter for multi-outlet support (Requirements: 6.2, 6.3)
+      const filtersWithOutlet: MovementFilters = {
+        ...filters,
+        outletId: outletFilter?.outletId,
+      };
+      const data = await getStockMovements(filtersWithOutlet);
       setReportData(data);
     } catch (err) {
       setError('Gagal memuat laporan pergerakan stok');

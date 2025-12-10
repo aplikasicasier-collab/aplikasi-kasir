@@ -1234,3 +1234,192 @@ describe('Dashboard Summary Accuracy', () => {
     );
   });
 });
+
+
+/**
+ * **Feature: multi-outlet, Property 12: Report Outlet Filtering**
+ * **Validates: Requirements 6.2, 6.3**
+ * 
+ * For any report with outlet filter: filtering by specific outlet should return data 
+ * for that outlet only, AND filtering by "all outlets" (no filter) should return 
+ * combined data from all outlets.
+ */
+import {
+  filterTransactionsByOutletForReport,
+  aggregateSalesWithOutletFilter,
+} from './reports';
+
+describe('Report Outlet Filtering', () => {
+  // Arbitrary for generating mock transactions with outlet
+  const transactionWithOutletArb = fc.record({
+    id: fc.uuid(),
+    total_amount: fc.float({ min: 1, max: 10000, noNaN: true }),
+    transaction_date: fc.integer({ min: 1704067200000, max: 1735689600000 })
+      .map(ts => new Date(ts).toISOString()),
+    outlet_id: fc.option(fc.uuid(), { nil: undefined }),
+  });
+
+  it('Property 12.1: Filter by specific outlet returns only transactions from that outlet', () => {
+    fc.assert(
+      fc.property(
+        fc.array(transactionWithOutletArb, { minLength: 1, maxLength: 50 }),
+        fc.uuid(),
+        (transactions, targetOutletId) => {
+          // Ensure some transactions have the target outlet
+          const transactionsWithTarget = transactions.map((tx, i) => 
+            i % 3 === 0 ? { ...tx, outlet_id: targetOutletId } : tx
+          );
+
+          const filtered = filterTransactionsByOutletForReport(transactionsWithTarget, targetOutletId);
+
+          // All filtered transactions should have the target outlet_id
+          return filtered.every(tx => tx.outlet_id === targetOutletId);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  it('Property 12.2: Filter with no outlet returns all transactions', () => {
+    fc.assert(
+      fc.property(
+        fc.array(transactionWithOutletArb, { minLength: 0, maxLength: 50 }),
+        (transactions) => {
+          const filtered = filterTransactionsByOutletForReport(transactions, undefined);
+
+          // Should return all transactions
+          return filtered.length === transactions.length;
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  it('Property 12.3: Aggregated sales for specific outlet equals sum of that outlet\'s transactions', () => {
+    fc.assert(
+      fc.property(
+        fc.array(transactionWithOutletArb, { minLength: 1, maxLength: 50 }),
+        fc.uuid(),
+        (transactions, targetOutletId) => {
+          // Ensure some transactions have the target outlet
+          const transactionsWithTarget = transactions.map((tx, i) => 
+            i % 3 === 0 ? { ...tx, outlet_id: targetOutletId } : tx
+          );
+
+          const result = aggregateSalesWithOutletFilter(transactionsWithTarget, targetOutletId);
+
+          // Calculate expected total manually
+          const expectedTotal = transactionsWithTarget
+            .filter(tx => tx.outlet_id === targetOutletId)
+            .reduce((sum, tx) => sum + tx.total_amount, 0);
+
+          // Allow small floating point tolerance
+          return Math.abs(result.totalSales - expectedTotal) < 0.01;
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  it('Property 12.4: Aggregated sales with no filter equals sum of all transactions', () => {
+    fc.assert(
+      fc.property(
+        fc.array(transactionWithOutletArb, { minLength: 0, maxLength: 50 }),
+        (transactions) => {
+          const result = aggregateSalesWithOutletFilter(transactions, undefined);
+
+          // Calculate expected total manually
+          const expectedTotal = transactions.reduce((sum, tx) => sum + tx.total_amount, 0);
+
+          // Allow small floating point tolerance
+          return Math.abs(result.totalSales - expectedTotal) < 0.01;
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  it('Property 12.5: Transaction count for specific outlet matches filtered count', () => {
+    fc.assert(
+      fc.property(
+        fc.array(transactionWithOutletArb, { minLength: 1, maxLength: 50 }),
+        fc.uuid(),
+        (transactions, targetOutletId) => {
+          // Ensure some transactions have the target outlet
+          const transactionsWithTarget = transactions.map((tx, i) => 
+            i % 3 === 0 ? { ...tx, outlet_id: targetOutletId } : tx
+          );
+
+          const result = aggregateSalesWithOutletFilter(transactionsWithTarget, targetOutletId);
+
+          // Calculate expected count manually
+          const expectedCount = transactionsWithTarget.filter(tx => tx.outlet_id === targetOutletId).length;
+
+          return result.transactionCount === expectedCount;
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  it('Property 12.6: Filter with non-existent outlet returns empty result', () => {
+    fc.assert(
+      fc.property(
+        fc.array(transactionWithOutletArb, { minLength: 0, maxLength: 50 }),
+        fc.uuid(),
+        (transactions, nonExistentOutletId) => {
+          // Ensure no transactions have the target outlet
+          const transactionsWithoutTarget = transactions.map(tx => ({
+            ...tx,
+            outlet_id: tx.outlet_id === nonExistentOutletId ? 'different-id' : tx.outlet_id,
+          }));
+
+          const result = aggregateSalesWithOutletFilter(transactionsWithoutTarget, nonExistentOutletId);
+
+          return result.totalSales === 0 && result.transactionCount === 0;
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  it('Property 12.7: Sum of all outlet-specific sales equals total sales (when outlets are distinct)', () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.uuid(), { minLength: 2, maxLength: 5 }),
+        fc.array(transactionWithOutletArb, { minLength: 1, maxLength: 50 }),
+        (outletIds, baseTransactions) => {
+          // Assign transactions to specific outlets
+          const transactions = baseTransactions.map((tx, i) => ({
+            ...tx,
+            outlet_id: outletIds[i % outletIds.length],
+          }));
+
+          // Get total sales without filter
+          const totalResult = aggregateSalesWithOutletFilter(transactions, undefined);
+
+          // Sum sales from each outlet
+          let sumOfOutletSales = 0;
+          for (const outletId of outletIds) {
+            const outletResult = aggregateSalesWithOutletFilter(transactions, outletId);
+            sumOfOutletSales += outletResult.totalSales;
+          }
+
+          // Sum of outlet-specific sales should equal total sales
+          return Math.abs(sumOfOutletSales - totalResult.totalSales) < 0.01;
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  it('Property 12.8: Empty transactions array returns zero for any outlet filter', () => {
+    const resultWithFilter = aggregateSalesWithOutletFilter([], 'any-outlet-id');
+    const resultWithoutFilter = aggregateSalesWithOutletFilter([], undefined);
+
+    expect(resultWithFilter.totalSales).toBe(0);
+    expect(resultWithFilter.transactionCount).toBe(0);
+    expect(resultWithoutFilter.totalSales).toBe(0);
+    expect(resultWithoutFilter.transactionCount).toBe(0);
+  });
+});
